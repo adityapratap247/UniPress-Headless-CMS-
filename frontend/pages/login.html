@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login – UniPress</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="logo-icon">⚡</div>
+        <h1>UniPress</h1>
+        <p>Sign in to manage your content</p>
+      </div>
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" id="email" class="form-control" placeholder="admin@cms.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <div id="login-error" class="form-error hidden" style="margin-bottom:8px"></div>
+        <button type="submit" class="btn btn-primary w-full mt-2" id="login-btn" style="justify-content:center;padding:11px">Sign In</button>
+      </form>
+      <p class="text-xs text-muted mt-4" style="text-align:center">UniPress v1.0 · Node.js + MongoDB</p>
+    </div>
+  </div>
+  <div id="toast-container"></div>
+  <script src="../assets/js/core.js"></script>
+  <script>
+    if (auth.isLoggedIn()) window.location.href = '/pages/dashboard.html';
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('login-btn');
+      const errEl = document.getElementById('login-error');
+      errEl.classList.add('hidden');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loader"></span>&nbsp; Signing in...';
+      try {
+        await auth.login(document.getElementById('email').value, document.getElementById('password').value);
+        window.location.href = '/pages/dashboard.html';
+      } catch (err) {
+        errEl.textContent = err.message || 'Invalid credentials. Please try again.';
+        errEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = 'Sign In';
+      }
+    });
+  </script>
+</body>
+</html>

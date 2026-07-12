@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Content Types – CMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<div class="app-layout" id="app-layout"></div>
+
+<!-- Create/Edit Content Type Modal -->
+<div class="modal-overlay" id="ct-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 class="modal-title" id="ct-modal-title">New Content Type</h3>
+      <button class="modal-close" onclick="modal.close('ct-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Name <span class="required">*</span></label>
+          <input type="text" id="ct-name" class="form-control" placeholder="e.g. Blog Posts">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Icon (emoji)</label>
+          <input type="text" id="ct-icon" class="form-control" placeholder="📄">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" id="ct-description" class="form-control" placeholder="What is this content type for?">
+      </div>
+      <div class="form-group flex gap-3" style="display:flex;align-items:center;gap:20px">
+        <label class="form-check"><input type="checkbox" id="ct-draftable" checked> Allow drafts</label>
+        <label class="form-check"><input type="checkbox" id="ct-published"> Published (accessible via API)</label>
+      </div>
+      <div style="margin-top:20px">
+        <div class="flex items-center justify-between mb-3" style="display:flex;align-items:center;justify-content:space-between">
+          <h4 style="font-size:14px;font-weight:600">Fields</h4>
+          <button class="btn btn-sm btn-primary" onclick="openAddField()">+ Add Field</button>
+        </div>
+        <div id="fields-list"><div class="empty-state" style="padding:24px"><div class="empty-icon" style="font-size:32px">📋</div><p>No fields yet. Add your first field.</p></div></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="modal.close('ct-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCT()" id="ct-save-btn">Create Content Type</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Field Modal -->
+<div class="modal-overlay" id="field-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="field-modal-title">Add Field</h3>
+      <button class="modal-close" onclick="modal.close('field-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Field Type</label>
+        <div class="field-type-grid" id="field-type-grid">
+          <button class="field-type-btn selected" data-type="text" onclick="selectFieldType('text')"><span class="ft-icon">📝</span>Text</button>
+          <button class="field-type-btn" data-type="textarea" onclick="selectFieldType('textarea')"><span class="ft-icon">📄</span>Textarea</button>
+          <button class="field-type-btn" data-type="richtext" onclick="selectFieldType('richtext')"><span class="ft-icon">✍️</span>Rich Text</button>
+          <button class="field-type-btn" data-type="number" onclick="selectFieldType('number')"><span class="ft-icon">🔢</span>Number</button>
+          <button class="field-type-btn" data-type="boolean" onclick="selectFieldType('boolean')"><span class="ft-icon">☑️</span>Boolean</button>
+          <button class="field-type-btn" data-type="date" onclick="selectFieldType('date')"><span class="ft-icon">📅</span>Date</button>
+          <button class="field-type-btn" data-type="email" onclick="selectFieldType('email')"><span class="ft-icon">📧</span>Email</button>
+          <button class="field-type-btn" data-type="url" onclick="selectFieldType('url')"><span class="ft-icon">🔗</span>URL</button>
+          <button class="field-type-btn" data-type="select" onclick="selectFieldType('select')"><span class="ft-icon">📋</span>Select</button>
+          <button class="field-type-btn" data-type="tags" onclick="selectFieldType('tags')"><span class="ft-icon">🏷️</span>Tags</button>
+          <button class="field-type-btn" data-type="media" onclick="selectFieldType('media')"><span class="ft-icon">🖼️</span>Media</button>
+          <button class="field-type-btn" data-type="json" onclick="selectFieldType('json')"><span class="ft-icon">{ }</span>JSON</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Label <span class="required">*</span></label>
+          <input type="text" id="field-label" class="form-control" placeholder="e.g. Article Title" oninput="autoFieldName()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">API Name <span class="required">*</span></label>
+          <input type="text" id="field-name" class="form-control" placeholder="e.g. article_title">
+          <div class="form-hint">Alphanumeric + underscore only</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Placeholder</label>
+        <input type="text" id="field-placeholder" class="form-control" placeholder="Hint text shown in the form">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description / Help Text</label>
+        <input type="text" id="field-description" class="form-control" placeholder="Guidance for editors">
+      </div>
+      <div class="form-group" style="display:flex;gap:20px">
+        <label class="form-check"><input type="checkbox" id="field-required"> Required</label>
+        <label class="form-check"><input type="checkbox" id="field-unique"> Unique</label>
+      </div>
+      <div id="select-options-section" class="hidden">
+        <div class="form-group">
+          <label class="form-label">Options</label>
+          <div id="select-options-list"></div>
+          <button class="btn btn-sm btn-secondary mt-2" onclick="addSelectOption()">+ Add Option</button>
+        </div>
+      </div>
+      <div id="number-options-section" class="hidden">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Min</label><input type="number" id="field-min" class="form-control"></div>
+          <div class="form-group"><label class="form-label">Max</label><input type="number" id="field-max" class="form-control"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="modal.close('field-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveField()" id="save-field-btn">Save Field</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/core.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+let contentTypes = [], fields = [], editingCTId = null, editingFieldIdx = null, selectedFieldType = 'text';
+const FIELD_ICONS = { text:'📝', textarea:'📄', richtext:'✍️', number:'🔢', boolean:'☑️', date:'📅', email:'📧', url:'🔗', select:'📋', tags:'🏷️', media:'🖼️', json:'{ }', relation:'🔗' };
+
+(async () => {
+  await initLayout('Content Types', 'content-types');
+  document.getElementById('topbar-actions').innerHTML = `<button class="btn btn-primary" onclick="openCreateCT()">+ New Content Type</button>`;
+  loadContentTypes();
+})();
+
+async function loadContentTypes() {
+  const content = document.getElementById('page-content');
+  content.innerHTML = '<div class="page-loader"><span class="loader"></span></div>';
+  try {
+    const res = await api.get('/content-types');
+    contentTypes = res.data.contentTypes;
+    renderContentTypes();
+  } catch(err) {
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Failed to load</h3><p>${err.message}</p><button class="btn btn-primary mt-3" onclick="loadContentTypes()">Retry</button></div>`;
+  }
+}
+
+function renderContentTypes() {
+  const content = document.getElementById('page-content');
+  if (contentTypes.length === 0) {
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">🗂️</div><h3>No content types yet</h3><p>Create your first content type to start managing structured content</p><button class="btn btn-primary" onclick="openCreateCT()">+ Create Content Type</button></div>`;
+    return;
+  }
+  content.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+    ${contentTypes.map(ct => `
+    <div class="card" style="cursor:pointer;transition:border-color 0.18s" onmouseenter="this.style.borderColor='var(--primary)'" onmouseleave="this.style.borderColor='var(--border)'" onclick="navigate('entries?ct=${ct._id}')">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:26px">${ct.icon||'📄'}</span>
+          <div><div style="font-weight:600">${utils.escapeHtml(ct.name)}</div><div class="text-xs text-muted">/${ct.slug}</div></div>
+        </div>
+        <div class="dropdown" onclick="event.stopPropagation()">
+          <button class="btn btn-icon btn-secondary" onclick="toggleDropdown('dd-${ct._id}')">⋮</button>
+          <div class="dropdown-menu" id="dd-${ct._id}">
+            <div class="dropdown-item" onclick="openEditCT('${ct._id}')">✏️ Edit</div>
+            <div class="dropdown-item" onclick="navigate('entries?ct=${ct._id}')">📄 View Entries</div>
+            <div class="dropdown-item danger" onclick="deleteCT('${ct._id}')">🗑️ Delete</div>
+          </div>
+        </div>
+      </div>
+      ${ct.description ? `<p class="text-sm text-muted" style="margin-bottom:12px">${utils.escapeHtml(ct.description)}</p>` : ''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span class="badge ${ct.isPublished?'badge-success':'badge-neutral'}">${ct.isPublished?'● Published':'○ Draft'}</span>
+        <span class="badge badge-info">${ct.fields?.length||0} fields</span>
+        <span class="badge badge-neutral">${ct.entriesCount||0} entries</span>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function toggleDropdown(id) {
+  document.querySelectorAll('.dropdown-menu').forEach(d => { if (d.id !== id) d.classList.remove('open'); });
+  document.getElementById(id)?.classList.toggle('open');
+}
+document.addEventListener('click', () => document.querySelectorAll('.dropdown-menu').forEach(d => d.classList.remove('open')));
+
+function openCreateCT() {
+  editingCTId = null; fields = [];
+  ['ct-name','ct-icon','ct-description'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ct-draftable').checked = true;
+  document.getElementById('ct-published').checked = false;
+  document.getElementById('ct-modal-title').textContent = 'New Content Type';
+  document.getElementById('ct-save-btn').textContent = 'Create Content Type';
+  renderFieldsList();
+  modal.open('ct-modal');
+}
+
+function openEditCT(id) {
+  editingCTId = id;
+  const ct = contentTypes.find(c => c._id === id);
+  if (!ct) return;
+  fields = JSON.parse(JSON.stringify(ct.fields || []));
+  document.getElementById('ct-name').value = ct.name;
+  document.getElementById('ct-icon').value = ct.icon || '';
+  document.getElementById('ct-description').value = ct.description || '';
+  document.getElementById('ct-draftable').checked = ct.draftable !== false;
+  document.getElementById('ct-published').checked = !!ct.isPublished;
+  document.getElementById('ct-modal-title').textContent = 'Edit Content Type';
+  document.getElementById('ct-save-btn').textContent = 'Save Changes';
+  renderFieldsList();
+  modal.open('ct-modal');
+}
+
+function renderFieldsList() {
+  const el = document.getElementById('fields-list');
+  if (!fields.length) { el.innerHTML = '<div class="empty-state" style="padding:24px"><div class="empty-icon" style="font-size:32px">📋</div><p>No fields yet. Add your first field.</p></div>'; return; }
+  el.innerHTML = fields.map((f, i) => `
+    <div class="field-item">
+      <span style="font-size:18px">${FIELD_ICONS[f.type]||'📝'}</span>
+      <div class="field-info">
+        <div class="field-name">${utils.escapeHtml(f.label)} ${f.required?'<span style="color:var(--danger)">*</span>':''}</div>
+        <div class="field-type">${f.name} · ${f.type}</div>
+      </div>
+      <div class="field-actions">
+        <button class="btn btn-sm btn-secondary" onclick="editField(${i})">✏️</button>
+        <button class="btn btn-sm btn-danger" onclick="removeField(${i})">🗑️</button>
+      </div>
+    </div>`).join('');
+}
+
+async function saveCT() {
+  const name = document.getElementById('ct-name').value.trim();
+  if (!name) return toast.error('Content type name is required');
+  const body = {
+    name, icon: document.getElementById('ct-icon').value || '📄',
+    description: document.getElementById('ct-description').value,
+    draftable: document.getElementById('ct-draftable').checked,
+    isPublished: document.getElementById('ct-published').checked,
+    fields: [...fields].sort((a,b) => (a.order||0)-(b.order||0)),
+  };
+  try {
+    if (editingCTId) { await api.patch(`/content-types/${editingCTId}`, body); toast.success('Content type updated'); }
+    else { await api.post('/content-types', body); toast.success('Content type created'); }
+    modal.close('ct-modal'); loadContentTypes();
+  } catch(err) { toast.error(err.message); }
+}
+
+async function deleteCT(id) {
+  if (!await utils.confirm('Delete this content type? This cannot be undone.')) return;
+  try { await api.delete(`/content-types/${id}`); toast.success('Content type deleted'); loadContentTypes(); }
+  catch(err) { toast.error(err.message); }
+}
+
+// Field modal
+function openAddField() {
+  editingFieldIdx = null; selectedFieldType = 'text';
+  ['field-label','field-name','field-placeholder','field-description'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('field-required').checked = false;
+  document.getElementById('field-unique').checked = false;
+  document.getElementById('select-options-list').innerHTML = '';
+  document.getElementById('select-options-section').classList.add('hidden');
+  document.getElementById('number-options-section').classList.add('hidden');
+  selectFieldType('text');
+  document.getElementById('field-modal-title').textContent = 'Add Field';
+  document.getElementById('save-field-btn').textContent = 'Add Field';
+  modal.open('field-modal');
+}
+
+function editField(idx) {
+  editingFieldIdx = idx;
+  const f = fields[idx];
+  selectedFieldType = f.type;
+  document.getElementById('field-label').value = f.label;
+  document.getElementById('field-name').value = f.name;
+  document.getElementById('field-placeholder').value = f.placeholder||'';
+  document.getElementById('field-description').value = f.description||'';
+  document.getElementById('field-required').checked = !!f.required;
+  document.getElementById('field-unique').checked = !!f.unique;
+  selectFieldType(f.type);
+  if (f.type === 'select' && f.options) { document.getElementById('select-options-list').innerHTML=''; f.options.forEach(o => addSelectOption(o.label, o.value)); }
+  if (f.min !== undefined) document.getElementById('field-min').value = f.min;
+  if (f.max !== undefined) document.getElementById('field-max').value = f.max;
+  document.getElementById('field-modal-title').textContent = 'Edit Field';
+  document.getElementById('save-field-btn').textContent = 'Save Changes';
+  modal.open('field-modal');
+}
+
+function selectFieldType(type) {
+  selectedFieldType = type;
+  document.querySelectorAll('.field-type-btn').forEach(b => b.classList.toggle('selected', b.dataset.type === type));
+  document.getElementById('select-options-section').classList.toggle('hidden', type !== 'select');
+  document.getElementById('number-options-section').classList.toggle('hidden', !['number','text','textarea'].includes(type));
+}
+
+function autoFieldName() {
+  const label = document.getElementById('field-label').value;
+  const nameEl = document.getElementById('field-name');
+  if (!nameEl.dataset.manual) nameEl.value = label.toLowerCase().trim().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('field-name')?.addEventListener('input', function() { this.dataset.manual = this.value ? 'true' : ''; });
+});
+
+function addSelectOption(label='', value='') {
+  const list = document.getElementById('select-options-list');
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;gap:8px;margin-bottom:8px';
+  div.innerHTML = `<input type="text" class="form-control opt-label" placeholder="Label" value="${utils.escapeHtml(label)}" style="flex:1"><input type="text" class="form-control opt-value" placeholder="Value" value="${utils.escapeHtml(value)}" style="flex:1"><button class="btn btn-sm btn-danger btn-icon" onclick="this.parentElement.remove()" type="button">🗑️</button>`;
+  list.appendChild(div);
+}
+
+function saveField() {
+  const label = document.getElementById('field-label').value.trim();
+  const name = document.getElementById('field-name').value.trim();
+  if (!label) return toast.error('Label is required');
+  if (!name) return toast.error('API name is required');
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) return toast.error('API name must be alphanumeric with underscores');
+  if (fields.some((f, i) => f.name === name && i !== editingFieldIdx)) return toast.error(`Field name "${name}" already exists`);
+  const fieldData = {
+    label, name, type: selectedFieldType,
+    required: document.getElementById('field-required').checked,
+    unique: document.getElementById('field-unique').checked,
+    placeholder: document.getElementById('field-placeholder').value,
+    description: document.getElementById('field-description').value,
+    order: editingFieldIdx !== null ? fields[editingFieldIdx].order : fields.length,
+  };
+  if (selectedFieldType === 'select') {
+    fieldData.options = [...document.querySelectorAll('#select-options-list > div')].map(row => ({ label: row.querySelector('.opt-label').value, value: row.querySelector('.opt-value').value })).filter(o => o.label && o.value);
+  }
+  const minV = document.getElementById('field-min')?.value;
+  const maxV = document.getElementById('field-max')?.value;
+  if (minV !== '') fieldData.min = Number(minV);
+  if (maxV !== '') fieldData.max = Number(maxV);
+  if (editingFieldIdx !== null) fields[editingFieldIdx] = { ...fields[editingFieldIdx], ...fieldData };
+  else fields.push(fieldData);
+  renderFieldsList();
+  modal.close('field-modal');
+  toast.success(`Field "${label}" ${editingFieldIdx !== null ? 'updated' : 'added'}`);
+  editingFieldIdx = null;
+}
+
+function removeField(idx) { fields.splice(idx, 1); renderFieldsList(); }
+</script>
+</body>
+</html>

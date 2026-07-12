@@ -1,0 +1,33 @@
+2026-07-04 15:43:45 [info]: 🚀 CMS API running on port 5000 [development]
+2026-07-04 15:43:45 [info]: MongoDB connected: localhost
+2026-07-04 15:53:54 [info]: ::1 - - [04/Jul/2026:10:23:54 +0000] "POST /api/auth/login HTTP/1.1" 401 94 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 15:54:05 [info]: User login: admin@cms.com
+2026-07-04 15:54:05 [info]: ::1 - - [04/Jul/2026:10:24:05 +0000] "POST /api/auth/login HTTP/1.1" 200 721 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 15:54:05 [info]: ::1 - - [04/Jul/2026:10:24:05 +0000] "GET /api/auth/me HTTP/1.1" 200 346 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 15:54:05 [info]: ::1 - - [04/Jul/2026:10:24:05 +0000] "GET /api/dashboard/stats HTTP/1.1" 200 381 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:11:20 [info]: ::1 - - [04/Jul/2026:10:41:20 +0000] "GET /api/auth/me HTTP/1.1" 200 346 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:11:21 [info]: ::1 - - [04/Jul/2026:10:41:21 +0000] "GET /api/content-types HTTP/1.1" 200 4217 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:08 [info]: ::1 - - [04/Jul/2026:10:44:08 +0000] "POST /api/content-types HTTP/1.1" 201 669 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:08 [info]: ::1 - - [04/Jul/2026:10:44:08 +0000] "GET /api/content-types HTTP/1.1" 200 4845 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:13 [info]: ::1 - - [04/Jul/2026:10:44:13 +0000] "GET /api/auth/me HTTP/1.1" 200 346 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:13 [info]: ::1 - - [04/Jul/2026:10:44:13 +0000] "GET /api/content-types HTTP/1.1" 200 4845 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:16 [info]: ::1 - - [04/Jul/2026:10:44:16 +0000] "GET /api/auth/me HTTP/1.1" 200 346 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:16 [info]: ::1 - - [04/Jul/2026:10:44:16 +0000] "GET /api/content-types HTTP/1.1" 200 4845 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:18 [info]: ::1 - - [04/Jul/2026:10:44:18 +0000] "GET /api/auth/me HTTP/1.1" 200 346 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:18 [info]: ::1 - - [04/Jul/2026:10:44:18 +0000] "GET /api/content-types HTTP/1.1" 200 4845 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:30 [info]: ::1 - - [04/Jul/2026:10:44:30 +0000] "GET /api/auth/me HTTP/1.1" 200 346 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:30 [info]: ::1 - - [04/Jul/2026:10:44:30 +0000] "GET /api/media?page=1&limit=30 HTTP/1.1" 200 155 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:30 [info]: ::1 - - [04/Jul/2026:10:44:30 +0000] "GET /api/media/folders HTTP/1.1" 200 97 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:47 [info]: ::1 - - [04/Jul/2026:10:44:47 +0000] "GET /api/auth/me HTTP/1.1" 200 346 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:47 [info]: ::1 - - [04/Jul/2026:10:44:47 +0000] "GET /api/api-keys HTTP/1.1" 200 97 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:14:47 [info]: ::1 - - [04/Jul/2026:10:44:47 +0000] "GET /api/content-types HTTP/1.1" 200 4845 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:15:02 [info]: ::1 - - [04/Jul/2026:10:45:02 +0000] "POST /api/api-keys HTTP/1.1" 201 424 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:15:18 [info]: ::1 - - [04/Jul/2026:10:45:18 +0000] "GET /api/api-keys HTTP/1.1" 200 430 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+2026-07-04 16:15:46 [info]: SIGINT received. Shutting down gracefully...
+2026-07-06 14:42:53 [info]: 🚀 CMS API running on port 5000 [development]
+2026-07-06 14:42:53 [info]: MongoDB connected: localhost
+2026-07-06 14:44:07 [info]: User login: admin@cms.com
+2026-07-06 14:44:07 [info]: ::1 - - [06/Jul/2026:09:14:07 +0000] "POST /api/auth/login HTTP/1.1" 200 743 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+2026-07-06 14:44:07 [info]: ::1 - - [06/Jul/2026:09:14:07 +0000] "GET /api/auth/me HTTP/1.1" 200 346 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+2026-07-06 14:44:07 [info]: ::1 - - [06/Jul/2026:09:14:07 +0000] "GET /api/dashboard/stats HTTP/1.1" 200 467 "http://localhost:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+2026-07-06 14:44:32 [info]: SIGINT received. Shutting down gracefully...

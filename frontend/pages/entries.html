@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entries – CMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<div class="app-layout" id="app-layout"></div>
+
+<!-- Entry Form Modal -->
+<div class="modal-overlay" id="entry-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 class="modal-title" id="entry-modal-title">New Entry</h3>
+      <button class="modal-close" onclick="modal.close('entry-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="entry-form-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="modal.close('entry-modal')">Cancel</button>
+      <button class="btn btn-secondary" onclick="saveEntry('draft')" id="save-draft-btn">Save Draft</button>
+      <button class="btn btn-primary" onclick="saveEntry('published')" id="publish-btn">Publish</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/core.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+let contentTypes = [];
+let selectedCT = null;
+let entries = [];
+let editingEntryId = null;
+let currentPage = 1;
+let totalPages = 1;
+let statusFilter = '';
+let searchQuery = '';
+let searchTimer = null;
+
+(async () => {
+  await initLayout('Entries', 'entries');
+
+  // Read content type from URL
+  const params = new URLSearchParams(window.location.search);
+  const ctId = params.get('ct');
+
+  // Load content types for selector
+  const res = await api.get('/content-types');
+  contentTypes = res.data.contentTypes;
+
+  renderTopbarActions(ctId);
+
+  if (ctId) {
+    await selectCT(ctId);
+  } else {
+    renderCTSelector();
+  }
+})();
+
+function renderTopbarActions(ctId) {
+  const actions = document.getElementById('topbar-actions');
+  actions.innerHTML = `
+    <select class="form-control" id="ct-selector-top" style="width:auto;min-width:180px" onchange="onCTSelect(this.value)">
+      <option value="">— Select Content Type —</option>
+      ${contentTypes.map(ct => `<option value="${ct._id}" ${ct._id === ctId ? 'selected' : ''}>${ct.icon || '📄'} ${utils.escapeHtml(ct.name)}</option>`).join('')}
+    </select>
+    <button class="btn btn-primary" id="new-entry-btn" onclick="openCreateEntry()" ${!ctId ? 'disabled' : ''}>+ New Entry</button>
+  `;
+}
+
+async function onCTSelect(id) {
+  if (!id) { renderCTSelector(); selectedCT = null; return; }
+  history.replaceState(null, '', `?ct=${id}`);
+  document.getElementById('new-entry-btn').disabled = false;
+  await selectCT(id);
+}
+
+async function selectCT(id) {
+  selectedCT = contentTypes.find(ct => ct._id === id);
+  if (!selectedCT) return;
+  document.getElementById('page-title').textContent = `${selectedCT.icon || '📄'} ${selectedCT.name}`;
+  currentPage = 1; statusFilter = ''; searchQuery = '';
+  await loadEntries();
+}
+
+function renderCTSelector() {
+  const content = document.getElementById('page-content');
+  content.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">📄</div>
+      <h3>Select a Content Type</h3>
+      <p>Choose a content type from the dropdown above to manage its entries</p>
+      <button class="btn btn-primary" onclick="navigate('content-types')">Manage Content Types</button>
+    </div>`;
+}
+
+async function loadEntries() {
+  if (!selectedCT) return;
+  const content = document.getElementById('page-content');
+  content.innerHTML = '<div class="page-loader"><span class="loader"></span></div>';
+  try {
+    let url = `/content-types/${selectedCT._id}/entries?page=${currentPage}&limit=20`;
+    if (statusFilter) url += `&status=${statusFilter}`;
+    if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+    const res = await api.get(url);
+    entries = res.data.entries;
+    totalPages = res.pagination.totalPages;
+    renderEntries(res.pagination);
+  } catch(err) {
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Failed to load entries</h3><p>${err.message}</p></div>`;
+  }
+}
+
+function renderEntries(pagination) {
+  const content = document.getElementById('page-content');
+  const titleField = selectedCT.fields.find(f => ['text','email','url'].includes(f.type) && ['title','name','slug','heading','label'].includes(f.name))
+    || selectedCT.fields.find(f => f.type === 'text') || selectedCT.fields[0];
+
+  content.innerHTML = `
+    <div class="list-toolbar">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Search entries..." value="${utils.escapeHtml(searchQuery)}" oninput="onSearch(this.value)">
+      </div>
+      <select class="form-control" style="width:auto" onchange="onStatusFilter(this.value)">
+        <option value="">All Status</option>
+        <option value="draft" ${statusFilter==='draft'?'selected':''}>Draft</option>
+        <option value="published" ${statusFilter==='published'?'selected':''}>Published</option>
+        <option value="archived" ${statusFilter==='archived'?'selected':''}>Archived</option>
+      </select>
+      <span class="text-sm text-muted">${pagination.total} entries</span>
+    </div>
+
+    ${entries.length === 0 ? `
+      <div class="empty-state">
+        <div class="empty-icon">📄</div>
+        <h3>No entries yet</h3>
+        <p>Create your first ${selectedCT.name} entry</p>
+        <button class="btn btn-primary" onclick="openCreateEntry()">+ New Entry</button>
+      </div>` : `
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:32px"><input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)"></th>
+              ${titleField ? `<th>${utils.escapeHtml(titleField.label)}</th>` : '<th>Entry</th>'}
+              ${selectedCT.fields.slice(0, 3).filter(f => f !== titleField).map(f => `<th>${utils.escapeHtml(f.label)}</th>`).join('')}
+              <th>Status</th>
+              <th>Updated</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${entries.map(e => {
+              const titleVal = titleField ? e.data[titleField.name] : null;
+              const previewFields = selectedCT.fields.slice(0, 3).filter(f => f !== titleField);
+              return `
+              <tr>
+                <td><input type="checkbox" class="row-check" data-id="${e._id}"></td>
+                <td><div class="row-title">${utils.escapeHtml(titleVal || 'Untitled')}</div><div class="text-xs text-muted">${e._id}</div></td>
+                ${previewFields.map(f => `<td class="text-sm text-muted">${renderFieldPreview(e.data[f.name], f)}</td>`).join('')}
+                <td>${utils.getStatusBadge(e.status)}</td>
+                <td class="text-sm text-muted">${utils.formatDate(e.updatedAt)}</td>
+                <td>
+                  <div class="flex gap-2">
+                    <button class="btn btn-sm btn-secondary" onclick="openEditEntry('${e._id}')">✏️</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteEntry('${e._id}')">🗑️</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="bulk-bar" class="hidden" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 20px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);z-index:200">
+      <span id="bulk-count" class="text-sm">0 selected</span>
+      <button class="btn btn-sm btn-danger" onclick="bulkDelete()">🗑️ Delete Selected</button>
+      <button class="btn btn-sm btn-secondary" onclick="clearSelection()">✕ Clear</button>
+    </div>
+
+    ${totalPages > 1 ? `
+    <div class="pagination">
+      <button class="page-btn" onclick="changePage(${currentPage-1})" ${currentPage<=1?'disabled':''}>← Prev</button>
+      ${Array.from({length:totalPages},(_, i)=>i+1).map(p=>`<button class="page-btn ${p===currentPage?'active':''}" onclick="changePage(${p})">${p}</button>`).join('')}
+      <button class="page-btn" onclick="changePage(${currentPage+1})" ${currentPage>=totalPages?'disabled':''}>Next →</button>
+    </div>` : ''}
+  `}`;
+
+  // Checkbox listeners
+  document.querySelectorAll('.row-check').forEach(cb => cb.addEventListener('change', updateBulkBar));
+}
+
+function renderFieldPreview(val, field) {
+  if (val === undefined || val === null || val === '') return '<span class="text-muted">—</span>';
+  if (field.type === 'boolean') return val ? '✅' : '❌';
+  if (field.type === 'date') return utils.formatDate(val);
+  if (field.type === 'tags' && Array.isArray(val)) return val.slice(0,3).map(t=>`<span class="badge badge-neutral">${utils.escapeHtml(t)}</span>`).join(' ');
+  if (field.type === 'richtext') return '<span class="text-muted">[rich text]</span>';
+  if (field.type === 'json') return '<span class="text-muted">[JSON]</span>';
+  const str = String(val);
+  return utils.escapeHtml(str.length > 40 ? str.slice(0,40)+'…' : str);
+}
+
+function onSearch(val) {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { searchQuery = val; currentPage = 1; loadEntries(); }, 350);
+}
+
+function onStatusFilter(val) { statusFilter = val; currentPage = 1; loadEntries(); }
+function changePage(p) { if (p < 1 || p > totalPages) return; currentPage = p; loadEntries(); }
+
+function toggleSelectAll(checked) {
+  document.querySelectorAll('.row-check').forEach(cb => cb.checked = checked);
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const selected = document.querySelectorAll('.row-check:checked');
+  const bar = document.getElementById('bulk-bar');
+  if (!bar) return;
+  if (selected.length > 0) {
+    bar.classList.remove('hidden');
+    bar.style.display = 'flex';
+    document.getElementById('bulk-count').textContent = `${selected.length} selected`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function clearSelection() {
+  document.querySelectorAll('.row-check').forEach(cb => cb.checked = false);
+  document.getElementById('select-all').checked = false;
+  updateBulkBar();
+}
+
+async function bulkDelete() {
+  const ids = [...document.querySelectorAll('.row-check:checked')].map(cb => cb.dataset.id);
+  if (!await utils.confirm(`Delete ${ids.length} entries? This cannot be undone.`)) return;
+  try {
+    await api.post('/entries/bulk-delete', { ids });
+    toast.success(`${ids.length} entries deleted`);
+    loadEntries();
+  } catch(err) { toast.error(err.message); }
+}
+
+// ── Entry Form ──────────────────────────────────────────
+function openCreateEntry() {
+  if (!selectedCT) return toast.error('Please select a content type first');
+  editingEntryId = null;
+  document.getElementById('entry-modal-title').textContent = `New ${selectedCT.name}`;
+  renderEntryForm({});
+  modal.open('entry-modal');
+}
+
+async function openEditEntry(id) {
+  try {
+    const res = await api.get(`/entries/${id}`);
+    const entry = res.data.entry;
+    editingEntryId = id;
+    document.getElementById('entry-modal-title').textContent = `Edit Entry`;
+    renderEntryForm(entry.data, entry.status);
+    modal.open('entry-modal');
+  } catch(err) { toast.error(err.message); }
+}
+
+function renderEntryForm(data = {}, status = 'draft') {
+  const body = document.getElementById('entry-form-body');
+  if (!selectedCT.fields || selectedCT.fields.length === 0) {
+    body.innerHTML = '<div class="empty-state"><p>This content type has no fields defined.</p></div>';
+    return;
+  }
+
+  const sortedFields = [...selectedCT.fields].sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  body.innerHTML = sortedFields.map(field => renderFormField(field, data[field.name])).join('');
+
+  // Init tags inputs
+  body.querySelectorAll('[data-tags]').forEach(initTagsInput);
+
+  // Init rich text (simple textarea with toolbar note)
+  document.getElementById('save-draft-btn').style.display = selectedCT.draftable !== false ? '' : 'none';
+}
+
+function renderFormField(field, value) {
+  const id = `field-${field.name}`;
+  const req = field.required ? '<span class="required">*</span>' : '';
+  const hint = field.description ? `<div class="form-hint">${utils.escapeHtml(field.description)}</div>` : '';
+
+  let input = '';
+  const val = value !== undefined && value !== null ? value : (field.defaultValue ?? '');
+  const escaped = utils.escapeHtml(String(val));
+
+  switch(field.type) {
+    case 'text':
+    case 'email':
+    case 'url':
+      input = `<input type="${field.type === 'url' ? 'url' : field.type === 'email' ? 'email' : 'text'}"
+        id="${id}" class="form-control" value="${escaped}"
+        placeholder="${utils.escapeHtml(field.placeholder || '')}"
+        ${field.maxLength ? `maxlength="${field.maxLength}"` : ''}>`;
+      break;
+    case 'textarea':
+      input = `<textarea id="${id}" class="form-control" placeholder="${utils.escapeHtml(field.placeholder || '')}"
+        ${field.maxLength ? `maxlength="${field.maxLength}"` : ''}>${escaped}</textarea>`;
+      break;
+    case 'richtext':
+      input = `
+        <div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+          <div style="background:var(--bg);padding:6px 8px;border-bottom:1px solid var(--border);display:flex;gap:4px;flex-wrap:wrap">
+            ${['<b>B</b>','<i>I</i>','<u>U</u>'].map((lb,i) => `<button type="button" class="btn btn-sm btn-secondary" style="min-width:30px;padding:3px 8px" onclick="execCmd('${['bold','italic','underline'][i]}')">${lb}</button>`).join('')}
+            <button type="button" class="btn btn-sm btn-secondary" onclick="execCmd('insertUnorderedList')">• List</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="execCmd('insertOrderedList')">1. List</button>
+            <select class="form-control" style="width:auto;padding:3px 8px;height:auto;font-size:12px" onchange="execCmd('formatBlock',this.value);this.value=''">
+              <option value="">Heading</option>
+              <option value="h1">H1</option><option value="h2">H2</option><option value="h3">H3</option><option value="p">P</option>
+            </select>
+          </div>
+          <div id="${id}" class="richtext-editor" contenteditable="true"
+            style="min-height:120px;padding:12px;outline:none;color:var(--text);font-size:14px;line-height:1.7"
+            data-richtext="true">${val || ''}</div>
+        </div>`;
+      break;
+    case 'number':
+      input = `<input type="number" id="${id}" class="form-control" value="${escaped}"
+        placeholder="${utils.escapeHtml(field.placeholder || '')}"
+        ${field.min !== undefined ? `min="${field.min}"` : ''}
+        ${field.max !== undefined ? `max="${field.max}"` : ''}>`;
+      break;
+    case 'boolean':
+      input = `<label class="form-check" style="margin-top:4px">
+        <input type="checkbox" id="${id}" ${val === true || val === 'true' ? 'checked' : ''}>
+        <span>${utils.escapeHtml(field.placeholder || field.label)}</span>
+      </label>`;
+      break;
+    case 'date':
+      const dateVal = val ? new Date(val).toISOString().split('T')[0] : '';
+      input = `<input type="date" id="${id}" class="form-control" value="${dateVal}">`;
+      break;
+    case 'select':
+      input = `<select id="${id}" class="form-control">
+        <option value="">— Select —</option>
+        ${(field.options || []).map(o => `<option value="${utils.escapeHtml(o.value)}" ${o.value === val ? 'selected' : ''}>${utils.escapeHtml(o.label)}</option>`).join('')}
+      </select>`;
+      break;
+    case 'tags':
+      const tagsArr = Array.isArray(val) ? val : (val ? [val] : []);
+      input = `<div class="tags-input" id="${id}-wrap">
+        ${tagsArr.map(t => `<span class="tag-chip">${utils.escapeHtml(t)}<button type="button" onclick="removeTag(this)">✕</button></span>`).join('')}
+        <input type="text" placeholder="Type and press Enter" data-tags="${id}" onkeydown="handleTagInput(event,'${id}')">
+      </div>
+      <input type="hidden" id="${id}" value="${utils.escapeHtml(JSON.stringify(tagsArr))}">`;
+      break;
+    case 'media':
+      input = `<div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="${id}" class="form-control" value="${escaped}" placeholder="Media URL or upload path">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="navigate('media')">Browse</button>
+      </div>`;
+      break;
+    case 'json':
+      const jsonVal = typeof val === 'object' ? JSON.stringify(val, null, 2) : (val || '{}');
+      input = `<textarea id="${id}" class="form-control" style="font-family:monospace;font-size:13px" rows="5">${utils.escapeHtml(jsonVal)}</textarea>`;
+      break;
+    default:
+      input = `<input type="text" id="${id}" class="form-control" value="${escaped}">`;
+  }
+
+  return `<div class="form-group">
+    <label class="form-label" for="${id}">${utils.escapeHtml(field.label)} ${req}</label>
+    ${input}
+    ${hint}
+  </div>`;
+}
+
+function execCmd(cmd, val = null) { document.execCommand(cmd, false, val); }
+
+function handleTagInput(e, fieldId) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const input = e.target;
+    const tag = input.value.trim();
+    if (!tag) return;
+    const wrap = document.getElementById(`${fieldId}-wrap`);
+    const chip = document.createElement('span');
+    chip.className = 'tag-chip';
+    chip.innerHTML = `${utils.escapeHtml(tag)}<button type="button" onclick="removeTag(this)">✕</button>`;
+    wrap.insertBefore(chip, input);
+    input.value = '';
+    updateTagsHidden(fieldId);
+  }
+}
+
+function removeTag(btn) {
+  const chip = btn.parentElement;
+  const wrap = chip.parentElement;
+  const fieldId = wrap.id.replace('-wrap','');
+  chip.remove();
+  updateTagsHidden(fieldId);
+}
+
+function updateTagsHidden(fieldId) {
+  const wrap = document.getElementById(`${fieldId}-wrap`);
+  const tags = [...wrap.querySelectorAll('.tag-chip')].map(c => c.textContent.replace('✕','').trim());
+  document.getElementById(fieldId).value = JSON.stringify(tags);
+}
+
+function initTagsInput(el) { /* already handled by handleTagInput */ }
+
+function getFieldValue(field) {
+  const id = `field-${field.name}`;
+  const el = document.getElementById(id);
+  if (!el) return undefined;
+  switch(field.type) {
+    case 'boolean': return el.checked;
+    case 'number': return el.value === '' ? null : Number(el.value);
+    case 'tags': try { return JSON.parse(el.value || '[]'); } catch { return []; }
+    case 'richtext': return document.getElementById(id)?.innerHTML || '';
+    case 'json': try { return JSON.parse(el.value || '{}'); } catch { return el.value; }
+    default: return el.value || null;
+  }
+}
+
+async function saveEntry(status) {
+  const data = {};
+  for (const field of selectedCT.fields) {
+    const val = getFieldValue(field);
+    if (val !== undefined) data[field.name] = val;
+  }
+
+  try {
+    if (editingEntryId) {
+      await api.patch(`/entries/${editingEntryId}`, { data, status });
+      toast.success('Entry updated');
+    } else {
+      await api.post(`/content-types/${selectedCT._id}/entries`, { data, status });
+      toast.success('Entry created');
+    }
+    modal.close('entry-modal');
+    loadEntries();
+  } catch(err) {
+    toast.error(err.message || 'Failed to save entry');
+    if (err.errors) err.errors.forEach(e => toast.error(`${e.field}: ${e.message}`));
+  }
+}
+
+async function deleteEntry(id) {
+  if (!await utils.confirm('Delete this entry? This cannot be undone.')) return;
+  try {
+    await api.delete(`/entries/${id}`);
+    toast.success('Entry deleted');
+    loadEntries();
+  } catch(err) { toast.error(err.message); }
+}
+</script>
+</body>
+</html>

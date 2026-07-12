@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Media Library – CMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<div class="app-layout" id="app-layout"></div>
+
+<!-- Media Detail Modal -->
+<div class="modal-overlay" id="media-detail-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 class="modal-title">Media Details</h3>
+      <button class="modal-close" onclick="modal.close('media-detail-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="media-detail-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="media-delete-btn">🗑️ Delete</button>
+      <button class="btn btn-secondary" onclick="modal.close('media-detail-modal')">Close</button>
+      <button class="btn btn-primary" id="media-save-btn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal-overlay" id="upload-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">Upload Files</h3>
+      <button class="modal-close" onclick="modal.close('upload-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Folder</label>
+        <input type="text" id="upload-folder" class="form-control" value="general" placeholder="e.g. images, documents">
+      </div>
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+        <div class="upload-icon">📂</div>
+        <p>Click to browse or drag & drop files here</p>
+        <small>Images, PDFs, videos, audio — max 10MB each</small>
+        <input type="file" id="file-input" multiple hidden accept="image/*,application/pdf,video/*,audio/*,.txt,.json,.zip">
+      </div>
+      <div id="upload-preview" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px"></div>
+      <div id="upload-progress" class="hidden" style="margin-top:12px">
+        <div style="background:var(--bg3);border-radius:4px;overflow:hidden;height:6px">
+          <div id="progress-bar" style="height:100%;background:var(--primary);width:0%;transition:width 0.3s"></div>
+        </div>
+        <div id="upload-status" class="text-sm text-muted mt-2">Uploading...</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="modal.close('upload-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="uploadFiles()" id="upload-btn">Upload</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/core.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+let mediaItems = [];
+let currentPage = 1;
+let totalPages = 1;
+let typeFilter = '';
+let folderFilter = '';
+let selectedMedia = null;
+let selectedFiles = [];
+
+(async () => {
+  await initLayout('Media Library', 'media');
+  const actions = document.getElementById('topbar-actions');
+  actions.innerHTML = `<button class="btn btn-primary" onclick="openUpload()">+ Upload Files</button>`;
+  setupDragDrop();
+  loadMedia();
+})();
+
+function setupDragDrop() {
+  const zone = document.getElementById('upload-zone');
+  if (!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    selectedFiles = [...e.dataTransfer.files];
+    previewFiles();
+  });
+  document.getElementById('file-input').addEventListener('change', e => {
+    selectedFiles = [...e.target.files];
+    previewFiles();
+  });
+}
+
+function previewFiles() {
+  const preview = document.getElementById('upload-preview');
+  preview.innerHTML = selectedFiles.map(f => {
+    const isImg = f.type.startsWith('image/');
+    const icon = isImg ? '' : getFileIcon(f.type);
+    return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;text-align:center;width:90px">
+      ${isImg ? `<img src="${URL.createObjectURL(f)}" style="width:70px;height:55px;object-fit:cover;border-radius:4px;display:block;margin:0 auto 4px">` : `<div style="font-size:28px;margin-bottom:4px">${icon}</div>`}
+      <div style="font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${utils.escapeHtml(f.name.length > 12 ? f.name.slice(0,10)+'…' : f.name)}</div>
+      <div style="font-size:10px;color:var(--text3)">${utils.formatSize(f.size)}</div>
+    </div>`;
+  }).join('');
+}
+
+function getFileIcon(mime) {
+  if (mime === 'application/pdf') return '📄';
+  if (mime.startsWith('video/')) return '🎬';
+  if (mime.startsWith('audio/')) return '🎵';
+  if (mime === 'application/zip') return '📦';
+  return '📎';
+}
+
+function openUpload() {
+  selectedFiles = [];
+  document.getElementById('upload-preview').innerHTML = '';
+  document.getElementById('file-input').value = '';
+  document.getElementById('upload-progress').classList.add('hidden');
+  document.getElementById('upload-btn').disabled = false;
+  modal.open('upload-modal');
+}
+
+async function uploadFiles() {
+  if (selectedFiles.length === 0) return toast.error('Please select files to upload');
+  const btn = document.getElementById('upload-btn');
+  btn.disabled = true;
+  const progressEl = document.getElementById('upload-progress');
+  const progressBar = document.getElementById('progress-bar');
+  const statusEl = document.getElementById('upload-status');
+  progressEl.classList.remove('hidden');
+  statusEl.textContent = `Uploading ${selectedFiles.length} file(s)...`;
+  progressBar.style.width = '30%';
+
+  const formData = new FormData();
+  selectedFiles.forEach(f => formData.append('files', f));
+  formData.append('folder', document.getElementById('upload-folder').value || 'general');
+
+  try {
+    progressBar.style.width = '60%';
+    const res = await api.upload('/media/upload', formData);
+    progressBar.style.width = '100%';
+    statusEl.textContent = `✅ ${res.data.media.length} file(s) uploaded successfully!`;
+    setTimeout(() => { modal.close('upload-modal'); loadMedia(); }, 800);
+    toast.success(`${res.data.media.length} file(s) uploaded`);
+  } catch(err) {
+    toast.error(err.message || 'Upload failed');
+    btn.disabled = false;
+    progressEl.classList.add('hidden');
+  }
+}
+
+async function loadMedia() {
+  const content = document.getElementById('page-content');
+  content.innerHTML = '<div class="page-loader"><span class="loader"></span></div>';
+  try {
+    let url = `/media?page=${currentPage}&limit=30`;
+    if (typeFilter) url += `&type=${typeFilter}`;
+    if (folderFilter) url += `&folder=${encodeURIComponent(folderFilter)}`;
+    const [mediaRes, foldersRes] = await Promise.all([api.get(url), api.get('/media/folders')]);
+    mediaItems = mediaRes.data.media;
+    totalPages = mediaRes.pagination.totalPages;
+    renderMedia(mediaRes.pagination, foldersRes.data.folders);
+  } catch(err) {
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Failed to load</h3><p>${err.message}</p></div>`;
+  }
+}
+
+function renderMedia(pagination, folders) {
+  const content = document.getElementById('page-content');
+  content.innerHTML = `
+    <div class="list-toolbar" style="flex-wrap:wrap;gap:10px">
+      <div class="flex gap-2 items-center">
+        <select class="form-control" style="width:auto" onchange="typeFilter=this.value;currentPage=1;loadMedia()">
+          <option value="">All Types</option>
+          <option value="image" ${typeFilter==='image'?'selected':''}>🖼️ Images</option>
+          <option value="video" ${typeFilter==='video'?'selected':''}>🎬 Videos</option>
+          <option value="document" ${typeFilter==='document'?'selected':''}>📄 Documents</option>
+        </select>
+        <select class="form-control" style="width:auto" onchange="folderFilter=this.value;currentPage=1;loadMedia()">
+          <option value="">All Folders</option>
+          ${folders.map(f => `<option value="${utils.escapeHtml(f)}" ${folderFilter===f?'selected':''}>${utils.escapeHtml(f)}</option>`).join('')}
+        </select>
+      </div>
+      <span class="text-sm text-muted">${pagination.total} files</span>
+    </div>
+
+    ${mediaItems.length === 0 ? `
+      <div class="empty-state">
+        <div class="empty-icon">🖼️</div>
+        <h3>No media files yet</h3>
+        <p>Upload images, videos, PDFs and more</p>
+        <button class="btn btn-primary" onclick="openUpload()">+ Upload Files</button>
+      </div>` : `
+    <div class="media-grid" id="media-grid">
+      ${mediaItems.map(m => `
+        <div class="media-card" onclick="openMediaDetail('${m._id}')">
+          ${m.mimetype.startsWith('image/')
+            ? `<img src="http://localhost:5000${m.url}" class="media-thumb" alt="${utils.escapeHtml(m.alt || m.originalname)}" loading="lazy">`
+            : `<div class="media-thumb-placeholder">${getFileIcon(m.mimetype)}</div>`}
+          <div class="media-info">
+            <div class="media-name" title="${utils.escapeHtml(m.originalname)}">${utils.escapeHtml(m.originalname)}</div>
+            <div class="media-size">${utils.formatSize(m.size)} · ${m.folder}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+
+    ${totalPages > 1 ? `
+    <div class="pagination">
+      <button class="page-btn" onclick="changePage(${currentPage-1})" ${currentPage<=1?'disabled':''}>← Prev</button>
+      ${Array.from({length:totalPages},(_,i)=>i+1).map(p=>`<button class="page-btn ${p===currentPage?'active':''}" onclick="changePage(${p})">${p}</button>`).join('')}
+      <button class="page-btn" onclick="changePage(${currentPage+1})" ${currentPage>=totalPages?'disabled':''}>Next →</button>
+    </div>` : ''}`}
+  `;
+}
+
+function changePage(p) { if (p<1||p>totalPages) return; currentPage=p; loadMedia(); }
+
+async function openMediaDetail(id) {
+  try {
+    const res = await api.get(`/media/${id}`);
+    const m = res.data.media;
+    selectedMedia = m;
+    const isImg = m.mimetype.startsWith('image/');
+    const fullUrl = `http://localhost:5000${m.url}`;
+
+    document.getElementById('media-detail-body').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div>
+          ${isImg
+            ? `<img src="${fullUrl}" style="width:100%;border-radius:var(--radius-sm);object-fit:contain;max-height:300px;background:var(--bg3)">`
+            : `<div style="height:200px;display:flex;align-items:center;justify-content:center;font-size:64px;background:var(--bg3);border-radius:var(--radius-sm)">${getFileIcon(m.mimetype)}</div>`}
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <a href="${fullUrl}" target="_blank" class="btn btn-secondary btn-sm" style="flex:1;justify-content:center">🔗 Open URL</a>
+            <button class="btn btn-secondary btn-sm" onclick="copyUrl('${fullUrl}')">📋 Copy URL</button>
+          </div>
+        </div>
+        <div>
+          <div class="form-group">
+            <label class="form-label">Alt Text</label>
+            <input type="text" id="media-alt" class="form-control" value="${utils.escapeHtml(m.alt || '')}" placeholder="Describe the media">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Caption</label>
+            <input type="text" id="media-caption" class="form-control" value="${utils.escapeHtml(m.caption || '')}" placeholder="Optional caption">
+          </div>
+          <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:12px;font-size:12px;color:var(--text2)">
+            <div class="mb-2"><strong>File:</strong> ${utils.escapeHtml(m.originalname)}</div>
+            <div class="mb-2"><strong>Type:</strong> ${m.mimetype}</div>
+            <div class="mb-2"><strong>Size:</strong> ${utils.formatSize(m.size)}</div>
+            <div class="mb-2"><strong>Folder:</strong> ${m.folder}</div>
+            <div><strong>Uploaded:</strong> ${utils.formatDate(m.createdAt)}</div>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('media-save-btn').onclick = () => saveMediaMeta(id);
+    document.getElementById('media-delete-btn').onclick = () => confirmDeleteMedia(id);
+    modal.open('media-detail-modal');
+  } catch(err) { toast.error(err.message); }
+}
+
+async function saveMediaMeta(id) {
+  try {
+    await api.patch(`/media/${id}`, {
+      alt: document.getElementById('media-alt').value,
+      caption: document.getElementById('media-caption').value,
+    });
+    toast.success('Media updated');
+    modal.close('media-detail-modal');
+    loadMedia();
+  } catch(err) { toast.error(err.message); }
+}
+
+async function confirmDeleteMedia(id) {
+  if (!await utils.confirm('Delete this file permanently?')) return;
+  try {
+    await api.delete(`/media/${id}`);
+    toast.success('Media deleted');
+    modal.close('media-detail-modal');
+    loadMedia();
+  } catch(err) { toast.error(err.message); }
+}
+
+function copyUrl(url) {
+  navigator.clipboard.writeText(url).then(() => toast.success('URL copied!')).catch(() => toast.error('Copy failed'));
+}
+</script>
+</body>
+</html>

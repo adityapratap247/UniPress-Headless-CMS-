@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard – CMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<div class="app-layout" id="app-layout"></div>
+<script src="../assets/js/core.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+(async () => {
+  await initLayout('Dashboard', 'dashboard');
+  const content = document.getElementById('page-content');
+  content.innerHTML = '<div class="page-loader"><span class="loader"></span></div>';
+  try {
+    const res = await api.get('/dashboard/stats');
+    const { stats, recentEntries, contentTypes } = res.data;
+    content.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card primary"><div><div class="stat-label">Content Types</div><div class="stat-value">${stats.contentTypes}</div></div><div class="stat-icon">🗂️</div></div>
+        <div class="stat-card success"><div><div class="stat-label">Total Entries</div><div class="stat-value">${stats.entries}</div></div><div class="stat-icon">📄</div></div>
+        <div class="stat-card warning"><div><div class="stat-label">Published</div><div class="stat-value">${stats.published}</div></div><div class="stat-icon">🚀</div></div>
+        <div class="stat-card info"><div><div class="stat-label">Drafts</div><div class="stat-value">${stats.drafts}</div></div><div class="stat-icon">✏️</div></div>
+        <div class="stat-card"><div><div class="stat-label">Media Files</div><div class="stat-value">${stats.media}</div></div><div class="stat-icon">🖼️</div></div>
+        <div class="stat-card"><div><div class="stat-label">Team Members</div><div class="stat-value">${stats.users}</div></div><div class="stat-icon">👥</div></div>
+      </div>
+      <div class="grid-2" style="gap:20px">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Recent Entries</h3><button class="btn btn-sm btn-secondary" onclick="navigate('entries')">View All</button></div>
+          ${recentEntries.length === 0 ? '<div class="table-empty">No entries yet</div>' : `
+          <div class="table-wrap"><table>
+            <thead><tr><th>Title</th><th>Status</th><th>Date</th></tr></thead>
+            <tbody>${recentEntries.map(e => `<tr>
+              <td><div class="row-title">${utils.escapeHtml(e.data?.title || e.data?.name || 'Untitled')}</div></td>
+              <td>${utils.getStatusBadge(e.status)}</td>
+              <td class="text-sm text-muted">${utils.formatDate(e.createdAt)}</td>
+            </tr>`).join('')}</tbody>
+          </table></div>`}
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Content Types</h3><button class="btn btn-sm btn-secondary" onclick="navigate('content-types')">Manage</button></div>
+          ${contentTypes.length === 0 ? `<div class="empty-state" style="padding:20px"><div class="empty-icon">🗂️</div><p>No content types yet</p><button class="btn btn-primary btn-sm" onclick="navigate('content-types')">Create First</button></div>` :
+          `<div style="display:flex;flex-direction:column;gap:6px">${contentTypes.map(ct => `
+            <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg3);border-radius:var(--radius-sm);cursor:pointer" onclick="navigate('entries')">
+              <span style="font-size:20px">${ct.icon||'📄'}</span>
+              <span style="font-weight:500;flex:1">${utils.escapeHtml(ct.name)}</span>
+              <span class="text-muted text-xs">/${ct.slug}</span>
+            </div>`).join('')}</div>`}
+        </div>
+      </div>
+      <div class="card mt-4">
+        <div class="card-header"><h3 class="card-title">🔌 Public API Quick Reference</h3></div>
+        <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:16px;font-family:monospace;font-size:13px;color:var(--text2);line-height:2">
+          <div style="color:var(--text3)"># List published entries</div>
+          <div>GET <span style="color:var(--primary)">http://localhost:5000/api/v1/content/{slug}</span></div>
+          <div style="margin-top:4px">Headers: <span style="color:var(--success)">X-API-Key: cms_your_key</span></div>
+          <div style="color:var(--text3);margin-top:10px"># Filter + paginate</div>
+          <div>GET /api/v1/content/blog-posts?page=1&limit=10&author=Aditya</div>
+          <div style="color:var(--text3);margin-top:10px"># Single entry</div>
+          <div>GET /api/v1/content/{slug}/{id}</div>
+        </div>
+      </div>`;
+  } catch(err) {
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Failed to load dashboard</h3><p>${err.message}</p><button class="btn btn-primary mt-3" onclick="location.reload()">Retry</button></div>`;
+  }
+})();
+</script>
+</body>
+</html>

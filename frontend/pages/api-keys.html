@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Keys – CMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<div class="app-layout" id="app-layout"></div>
+
+<!-- Create Key Modal -->
+<div class="modal-overlay" id="key-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">Create API Key</h3>
+      <button class="modal-close" onclick="modal.close('key-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Name <span class="required">*</span></label>
+        <input type="text" id="key-name" class="form-control" placeholder="e.g. Production App, Next.js Frontend">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Permissions</label>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label class="form-check"><input type="checkbox" id="perm-read" checked disabled> Read – access published content (always enabled)</label>
+          <label class="form-check"><input type="checkbox" id="perm-write"> Write – create/update entries via API</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Allowed Content Types</label>
+        <div class="form-hint" style="margin-bottom:6px">Leave empty to allow access to all content types</div>
+        <div id="ct-checkboxes" style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Expiry Date (optional)</label>
+        <input type="date" id="key-expires" class="form-control">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="modal.close('key-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createKey()">Generate Key</button>
+    </div>
+  </div>
+</div>
+
+<!-- Key Reveal Modal -->
+<div class="modal-overlay" id="key-reveal-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">🔑 Your API Key</h3>
+    </div>
+    <div class="modal-body">
+      <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px;font-size:13px;color:var(--warning)">
+        ⚠️ Copy this key now — it will <strong>never be shown again</strong>.
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="text" id="revealed-key" class="form-control" readonly style="font-family:monospace;font-size:12px">
+        <button class="btn btn-secondary" onclick="copyKey()">📋 Copy</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="modal.close('key-reveal-modal');loadKeys()">Done</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/core.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+let apiKeys = [];
+let contentTypes = [];
+
+(async () => {
+  await initLayout('API Keys', 'api-keys');
+  const actions = document.getElementById('topbar-actions');
+  actions.innerHTML = `<button class="btn btn-primary" onclick="openCreateKey()">+ Generate API Key</button>`;
+  const [_, ctRes] = await Promise.all([loadKeys(), api.get('/content-types')]);
+  contentTypes = ctRes?.data?.contentTypes || [];
+})();
+
+async function loadKeys() {
+  const content = document.getElementById('page-content');
+  content.innerHTML = '<div class="page-loader"><span class="loader"></span></div>';
+  try {
+    const res = await api.get('/api-keys');
+    apiKeys = res.data.apiKeys;
+    renderKeys();
+  } catch(err) {
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Failed to load</h3><p>${err.message}</p></div>`;
+  }
+}
+
+function renderKeys() {
+  const content = document.getElementById('page-content');
+  if (apiKeys.length === 0) {
+    content.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔑</div>
+        <h3>No API keys yet</h3>
+        <p>Generate an API key to access published content from your applications</p>
+        <button class="btn btn-primary" onclick="openCreateKey()">+ Generate API Key</button>
+      </div>
+      ${renderApiDocs()}`;
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="card" style="padding:0;margin-bottom:24px">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Key</th><th>Permissions</th><th>Status</th><th>Last Used</th><th>Expires</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            ${apiKeys.map(k => `
+              <tr>
+                <td><div class="row-title">${utils.escapeHtml(k.name)}</div></td>
+                <td><code style="font-size:12px;background:var(--bg3);padding:2px 8px;border-radius:4px;color:var(--text2)">cms_…${utils.escapeHtml(k.keyPreview || '????')}</code></td>
+                <td>
+                  <div class="flex gap-1">
+                    <span class="badge badge-info">Read</span>
+                    ${k.permissions?.write ? '<span class="badge badge-warning">Write</span>' : ''}
+                  </div>
+                </td>
+                <td><span class="badge ${k.isActive ? 'badge-success' : 'badge-danger'}">${k.isActive ? '● Active' : '○ Revoked'}</span></td>
+                <td class="text-sm text-muted">${k.lastUsed ? utils.formatDate(k.lastUsed) : 'Never'}</td>
+                <td class="text-sm text-muted">${k.expiresAt ? utils.formatDate(k.expiresAt) : '∞ Never'}</td>
+                <td>
+                  <div class="flex gap-2">
+                    ${k.isActive ? `<button class="btn btn-sm btn-warning" onclick="revokeKey('${k._id}')">⛔ Revoke</button>` : ''}
+                    <button class="btn btn-sm btn-danger" onclick="deleteKey('${k._id}')">🗑️</button>
+                  </div>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ${renderApiDocs()}`;
+}
+
+function renderApiDocs() {
+  return `
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">📖 API Documentation</h3></div>
+      <div class="tabs">
+        <button class="tab active" onclick="showTab(this,'fetch')">Fetch</button>
+        <button class="tab" onclick="showTab(this,'axios')">Axios</button>
+        <button class="tab" onclick="showTab(this,'curl')">cURL</button>
+      </div>
+      <div id="tab-fetch" class="tab-panel">
+        <pre style="background:var(--bg3);border-radius:var(--radius-sm);padding:16px;font-size:12px;overflow-x:auto;color:var(--text2)"><code>// Get all published entries
+const res = await fetch('http://localhost:5000/api/v1/content/blog-posts', {
+  headers: { 'X-API-Key': 'cms_your_api_key_here' }
+});
+const { data, pagination } = await res.json();
+
+// Filter by field value
+fetch('/api/v1/content/products?category=electronics&limit=10')
+
+// Get single entry
+fetch('/api/v1/content/blog-posts/ENTRY_ID', {
+  headers: { 'X-API-Key': 'cms_your_api_key' }
+});</code></pre>
+      </div>
+      <div id="tab-axios" class="tab-panel hidden">
+        <pre style="background:var(--bg3);border-radius:var(--radius-sm);padding:16px;font-size:12px;overflow-x:auto;color:var(--text2)"><code>import axios from 'axios';
+
+const cms = axios.create({
+  baseURL: 'http://localhost:5000/api/v1',
+  headers: { 'X-API-Key': 'cms_your_api_key_here' }
+});
+
+// Get entries
+const { data } = await cms.get('/content/blog-posts');
+
+// Get single
+const { data: post } = await cms.get('/content/blog-posts/ENTRY_ID');</code></pre>
+      </div>
+      <div id="tab-curl" class="tab-panel hidden">
+        <pre style="background:var(--bg3);border-radius:var(--radius-sm);padding:16px;font-size:12px;overflow-x:auto;color:var(--text2)"><code># Get all published entries
+curl -H "X-API-Key: cms_your_key" \\
+  http://localhost:5000/api/v1/content/blog-posts
+
+# With pagination & filter
+curl -H "X-API-Key: cms_your_key" \\
+  "http://localhost:5000/api/v1/content/products?page=1&limit=10"
+
+# Single entry
+curl -H "X-API-Key: cms_your_key" \\
+  http://localhost:5000/api/v1/content/blog-posts/ENTRY_ID</code></pre>
+      </div>
+    </div>`;
+}
+
+function showTab(btn, tab) {
+  btn.closest('.card').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.closest('.card').querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+  btn.classList.add('active');
+  document.getElementById(`tab-${tab}`).classList.remove('hidden');
+}
+
+async function openCreateKey() {
+  document.getElementById('key-name').value = '';
+  document.getElementById('perm-write').checked = false;
+  document.getElementById('key-expires').value = '';
+  const ctBox = document.getElementById('ct-checkboxes');
+  if (contentTypes.length === 0) {
+    const res = await api.get('/content-types');
+    contentTypes = res.data.contentTypes;
+  }
+  ctBox.innerHTML = contentTypes.map(ct => `
+    <label class="form-check">
+      <input type="checkbox" class="ct-check" value="${ct.slug}">
+      ${ct.icon || '📄'} ${utils.escapeHtml(ct.name)} <span class="text-muted text-xs">(/${ct.slug})</span>
+    </label>`).join('');
+  modal.open('key-modal');
+}
+
+async function createKey() {
+  const name = document.getElementById('key-name').value.trim();
+  if (!name) return toast.error('Key name is required');
+  const allowedCTs = [...document.querySelectorAll('.ct-check:checked')].map(c => c.value);
+  const expires = document.getElementById('key-expires').value;
+  try {
+    const res = await api.post('/api-keys', {
+      name,
+      permissions: { read: true, write: document.getElementById('perm-write').checked },
+      allowedContentTypes: allowedCTs,
+      expiresAt: expires || null,
+    });
+    modal.close('key-modal');
+    document.getElementById('revealed-key').value = res.data.apiKey.key;
+    modal.open('key-reveal-modal');
+  } catch(err) { toast.error(err.message); }
+}
+
+function copyKey() {
+  const val = document.getElementById('revealed-key').value;
+  navigator.clipboard.writeText(val).then(() => toast.success('Key copied!')).catch(() => toast.error('Copy failed'));
+}
+
+async function revokeKey(id) {
+  if (!await utils.confirm('Revoke this API key? Apps using it will lose access.')) return;
+  try {
+    await api.patch(`/api-keys/${id}/revoke`);
+    toast.success('API key revoked');
+    loadKeys();
+  } catch(err) { toast.error(err.message); }
+}
+
+async function deleteKey(id) {
+  if (!await utils.confirm('Permanently delete this API key?')) return;
+  try {
+    await api.delete(`/api-keys/${id}`);
+    toast.success('API key deleted');
+    loadKeys();
+  } catch(err) { toast.error(err.message); }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Users – CMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<div class="app-layout" id="app-layout"></div>
+
+<!-- Create User Modal -->
+<div class="modal-overlay" id="user-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="user-modal-title">Invite User</h3>
+      <button class="modal-close" onclick="modal.close('user-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Full Name <span class="required">*</span></label>
+        <input type="text" id="u-name" class="form-control" placeholder="John Doe">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email <span class="required">*</span></label>
+        <input type="email" id="u-email" class="form-control" placeholder="john@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password <span class="required">*</span></label>
+        <input type="password" id="u-password" class="form-control" placeholder="Min 8 characters">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select id="u-role" class="form-control">
+          <option value="editor">Editor – can create/edit entries</option>
+          <option value="admin">Admin – manages content types & users</option>
+          <option value="viewer">Viewer – read-only access</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="modal.close('user-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUser()">Create User</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal-overlay" id="edit-user-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit User</h3>
+      <button class="modal-close" onclick="modal.close('edit-user-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input type="text" id="eu-name" class="form-control">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select id="eu-role" class="form-control">
+          <option value="viewer">Viewer</option>
+          <option value="editor">Editor</option>
+          <option value="admin">Admin</option>
+          <option value="superadmin">Superadmin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-check">
+          <input type="checkbox" id="eu-active"> Active account
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="modal.close('edit-user-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="updateUser()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/core.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+let users = [];
+let editingUserId = null;
+let currentUser = null;
+
+(async () => {
+  const user = await initLayout('Users', 'users');
+  currentUser = user;
+  if (!['superadmin','admin'].includes(user.role)) {
+    document.getElementById('page-content').innerHTML = `<div class="empty-state"><div class="empty-icon">🚫</div><h3>Access Denied</h3><p>You don't have permission to manage users</p></div>`;
+    return;
+  }
+  const actions = document.getElementById('topbar-actions');
+  actions.innerHTML = `<button class="btn btn-primary" onclick="openCreateUser()">+ Invite User</button>`;
+  loadUsers();
+})();
+
+async function loadUsers() {
+  const content = document.getElementById('page-content');
+  content.innerHTML = '<div class="page-loader"><span class="loader"></span></div>';
+  try {
+    const res = await api.get('/users');
+    users = res.data.users;
+    renderUsers();
+  } catch(err) {
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Failed to load users</h3><p>${err.message}</p></div>`;
+  }
+}
+
+function renderUsers() {
+  const content = document.getElementById('page-content');
+  content.innerHTML = `
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Last Login</th>
+              <th>Joined</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.map(u => `
+              <tr>
+                <td>
+                  <div class="flex items-center gap-2">
+                    <div style="width:34px;height:34px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0">
+                      ${u.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div class="row-title">${utils.escapeHtml(u.name)}</div>
+                      <div class="text-xs text-muted">${utils.escapeHtml(u.email)}</div>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="badge badge-${utils.roleColor(u.role)}">${u.role}</span></td>
+                <td><span class="badge ${u.isActive ? 'badge-success' : 'badge-danger'}">${u.isActive ? '● Active' : '○ Inactive'}</span></td>
+                <td class="text-sm text-muted">${u.lastLogin ? utils.formatDate(u.lastLogin) : 'Never'}</td>
+                <td class="text-sm text-muted">${utils.formatDate(u.createdAt)}</td>
+                <td>
+                  <div class="flex gap-2">
+                    <button class="btn btn-sm btn-secondary" onclick="openEditUser('${u._id}')">✏️</button>
+                    ${currentUser.role === 'superadmin' && u._id !== currentUser._id
+                      ? `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u._id}')">🗑️</button>` : ''}
+                  </div>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="margin-top:20px" class="card">
+      <h4 class="card-title mb-3">Role Permissions</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+        ${[
+          { role:'viewer', icon:'👁️', desc:'Read-only. Cannot create or modify content.' },
+          { role:'editor', icon:'✏️', desc:'Can create and edit entries. No type management.' },
+          { role:'admin', icon:'🛡️', desc:'Manages content types, entries, media, and users.' },
+          { role:'superadmin', icon:'👑', desc:'Full access including user deletion and system settings.' },
+        ].map(r => `
+          <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:12px">
+            <div style="font-size:20px;margin-bottom:6px">${r.icon}</div>
+            <div class="font-600 text-sm mb-1" style="text-transform:capitalize">${r.role}</div>
+            <div class="text-xs text-muted">${r.desc}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function openCreateUser() {
+  document.getElementById('u-name').value = '';
+  document.getElementById('u-email').value = '';
+  document.getElementById('u-password').value = '';
+  document.getElementById('u-role').value = 'editor';
+  modal.open('user-modal');
+}
+
+async function saveUser() {
+  const name = document.getElementById('u-name').value.trim();
+  const email = document.getElementById('u-email').value.trim();
+  const password = document.getElementById('u-password').value;
+  if (!name || !email || !password) return toast.error('All fields are required');
+  if (password.length < 8) return toast.error('Password must be at least 8 characters');
+  try {
+    await api.post('/users', { name, email, password, role: document.getElementById('u-role').value });
+    toast.success('User created successfully');
+    modal.close('user-modal');
+    loadUsers();
+  } catch(err) { toast.error(err.message); }
+}
+
+function openEditUser(id) {
+  editingUserId = id;
+  const user = users.find(u => u._id === id);
+  if (!user) return;
+  document.getElementById('eu-name').value = user.name;
+  document.getElementById('eu-role').value = user.role;
+  document.getElementById('eu-active').checked = user.isActive !== false;
+  modal.open('edit-user-modal');
+}
+
+async function updateUser() {
+  if (!editingUserId) return;
+  try {
+    await api.patch(`/users/${editingUserId}`, {
+      name: document.getElementById('eu-name').value,
+      role: document.getElementById('eu-role').value,
+      isActive: document.getElementById('eu-active').checked,
+    });
+    toast.success('User updated');
+    modal.close('edit-user-modal');
+    loadUsers();
+  } catch(err) { toast.error(err.message); }
+}
+
+async function deleteUser(id) {
+  const user = users.find(u => u._id === id);
+  if (!await utils.confirm(`Delete user "${user?.name}"? This cannot be undone.`)) return;
+  try {
+    await api.delete(`/users/${id}`);
+    toast.success('User deleted');
+    loadUsers();
+  } catch(err) { toast.error(err.message); }
+}
+</script>
+</body>
+</html>
