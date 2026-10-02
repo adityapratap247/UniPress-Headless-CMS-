@@ -6,6 +6,7 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const path = require('path');
+const port = process.env.PORT || 8000;
 
 const connectDB = require('./config/database');
 const routes = require('./routes/index');

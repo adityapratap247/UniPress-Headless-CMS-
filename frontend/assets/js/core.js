@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'https://unipress-headless-cms.onrender.com';
 
 const api = {
   getToken() { return localStorage.getItem('cms_token'); },
